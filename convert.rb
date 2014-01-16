@@ -1,9 +1,9 @@
 require 'rubygems'
+require 'nokogiri'
 require 'google/api_client'
 require 'google/api_client/client_secrets'
 require 'google/api_client/auth/file_storage'
 require 'google/api_client/auth/installed_app'
-require 'nokogiri'
 require 'uri'
 require 'digest'
 
@@ -145,11 +145,14 @@ def parse_node(client, node, in_p=false)
   text_start + node.children.collect{|n| parse_node(client, n)}.join.strip + text_end
 end
 
+template_file = "default.tex"
+
 if ARGV.length < 1
-  puts "Missing argument: file id"
+  puts "Usage: ./convert.rb gdrive_file_id [template.tex]"
   exit
 else
   file_id = ARGV[0]
+  template_file = ARGV[1] if ARGV.length == 2
 end
 
 client, drive = setup
@@ -158,38 +161,52 @@ result = client.execute api_method: drive.files.get, parameters: { 'fileId' => f
 
 file = result.data
 
-puts "Converting #{file.title}"
+@document_title = file.title
+
+puts "Converting #{file.title} [template: #{template_file}]"
+
+template = File.open(template_file, 'r')
+
 
 filename = "#{friendly_filename(file.title).downcase}.tex"
-
-out = File.open(filename, 'w')
-
-# document basics
-
-out.puts "\\documentclass[a4paper,11pt]{article}
-
-\\usepackage[T1]{fontenc}
-\\usepackage[english]{babel}
-\\usepackage{url}
-\\usepackage{graphicx}
-
-\\title{#{file.title}}
-
-\\author{#{file.lastModifyingUserName}}
-
-\\begin{document}
-
-\\maketitle"
 
 puts file.exportLinks['text/html']
 
 html_content = download_file(client, file.exportLinks['text/html'])
 
+# Debug write
+html_out = File.open("temp.html", 'w')
+html_out.puts html_content
+html_out.close
+#end Debug write
+
 doc = Nokogiri::HTML(html_content)
 
+content = ""
+
 doc.css('body').children.each do |node|
-  out.puts parse_node client, node
+  content = "#{content}#{parse_node client, node}\n"
 end
+
+replace_map = {
+  'title' => @document_title,
+  'author' => file.lastModifyingUserName,
+  'yield' => content
+}
+
+# Begin output and template parsing
+out = File.open(filename, 'w')
+
+template.each_line do |line|
+  out.puts line.gsub(/#\{([^}])\}/) do |match|
+    if replace_map[$1]
+      replace_map[$1]
+    else
+      "[Invalid data block]"
+    end
+  end
+end
+
 
 out.puts "\\end{document}"
 
