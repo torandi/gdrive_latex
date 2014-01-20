@@ -157,13 +157,13 @@ def parse_node(client, node, in_p=false)
       text_start = "\\end{abstract}"
       @mode = 'normal'
     else
-      text_start = node.content.strip.gsub("\"", "''").gsub(/\[ref:(.+?)\]/) do |match|
+      text_start = node.content.strip.gsub("\"", "''").gsub("&", "\&").gsub(/\[ref:(.+?)\]/) do |match|
         "~\\ref{#{$1}}"
       end
       text_end = ""
     end
   when "a"
-    unless (href = node['href']).nil?
+    unless (href = node['href']).nil? || href == "#"
       return "\\url{#{href}}" # We have to hack this, since we can't handle content and url in a text document
     else
       # maybe handle achoring here?
@@ -177,13 +177,32 @@ def parse_node(client, node, in_p=false)
       return symbol + parse_formula($1) + symbol
     else
       image_name = download_image(client, src)
-      return "\\begin{figure}[h!]
-        \\centering
-        \\includegraphics[width=0.45\\textwidth]{#{image_name}}
+      return "\\begin{figure}[ht]
+        \\begin{center}
+        \\includegraphics{#{image_name}}
         \\caption{\\small{Image caption}}
         \\label{#{image_name}}
+        \\end{center}
       \\end{figure}"
     end
+  when "table"
+    # Find count:
+    count = node.css("tr").first.css("td").count
+    text_start = "\\begin{tabular}{ #{count.times.collect{"l "}.join}}\n"
+    text_end = "\n\\end{tabular}\n"
+  when "tbody"
+    text_start = ""
+    text_end = ""
+  when "tr"
+    text_start = ""
+    text_end = "\\\\\n"
+    post_process = Proc.new { |text|
+      text.slice!(text.rindex("&"), 1)
+      text
+    }
+  when "td"
+    text_start = " "
+    text_end = " &"
   else
     puts "Unhandled node type #{node.name}"
   end
