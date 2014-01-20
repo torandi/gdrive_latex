@@ -147,8 +147,8 @@ def parse_node(client, node, in_p=false)
       return ""
     end
   when "span"
-    text_start = ""
-    text_end = ""
+    text_start = " "
+    text_end = " "
   when "text"
     if node.content.strip == "<abstract>"
       @mode = 'abstract'
@@ -157,9 +157,7 @@ def parse_node(client, node, in_p=false)
       text_start = "\\end{abstract}"
       @mode = 'normal'
     else
-      text_start = node.content.strip.gsub("\"", "''").gsub("&", "\&").gsub(/\[ref:(.+?)\]/) do |match|
-        "~\\ref{#{$1}}"
-      end
+      text_start = node.content.strip.gsub(/[\u201c\u201d"]/, "''").gsub("&", "\&").gsub(/\[ref:(.+?)\]/, "~\\ref{\1}")
       text_end = ""
     end
   when "a"
@@ -203,6 +201,15 @@ def parse_node(client, node, in_p=false)
   when "td"
     text_start = " "
     text_end = " &"
+  when "ul"
+    text_start = "\\begin{itemize}\n"
+    text_end = "\n\\end{itemize}\n"
+  when "ol"
+    text_start = "\\begin{enumerate}\n"
+    text_end = "\n\\end{enumerate}\n"
+  when "li"
+    text_start = "\\item "
+    text_end = "\n"
   else
     puts "Unhandled node type #{node.name}"
   end
