@@ -17,6 +17,7 @@ OUTPUT_DIR='latex/'
 @use_chapters = true #TODO: Options parsing
 @replace_backslash_in_formulas = true
 @image_caption = nil
+@numbered_equations = true
 
 @mode = 'normal'
 
@@ -183,8 +184,13 @@ def parse_node(client, node, alone_in_p=false)
   when "img"
     src = node['src']
     if src =~ /^https:\/\/www.google.com\/chart\?.*chl=(.+)/
-      symbol = alone_in_p ? " $$ " : " $ "
-      return symbol + parse_formula($1) + symbol
+      if alone_in_p && @numbered_equations
+        return "\\begin{equation}\n"+parse_formula($1)+"\n\\end{equation}\n"
+      elsif alone_in_p
+        return " $$"+parse_formula($1)+" $$"
+      else
+        return " $"+parse_formula($1) + "$ "
+      end
     else
       image_name = download_image(client, src)
       ret = "\\begin{figure}[ht]
