@@ -13,6 +13,11 @@ CACHED_API_FILE = "drive-#{API_VERSION}.cache"
 
 OUTPUT_DIR='latex/'
 
+
+@use_chapters = true #TODO: Options parsing
+
+@mode = 'normal'
+
 def setup
   client = Google::APIClient.new(
     :application_name => 'LaTeX Converter',
@@ -105,31 +110,58 @@ def parse_node(client, node, in_p=false)
 
   case node.node_name
   when /h([1-9])/
-    text_start = "\\" + ($1.to_i - 2).times.collect{"sub"}.join + "section {"
+    h_num = $1.to_i
+    text_start = "\\" + (h_num - (@use_chapters ? 2 : 1)).times.collect{"sub"}.join + "section {"
+
+    text_start = "\\chapter {" if h_num == 1 && @use_chapters
+
     text_end = "}\n"
     post_process = Proc.new do |text|
       postfix = ""
+      nonumber = false
       text.gsub!(/\[label:(.*)\]/) { |match|
         postfix = "\\label{#{$1}}"
         ""
       }
+      text.gsub!(/\[nonumber\]/) { |match|
+        nonumber = true
+        ""
+      }
+
+      text.gsub!(/\{/, "*{") if nonumber
 
       "#{text}#{postfix}"
     end
   when "p"
-    text_start = "\n"
+    text_start = ""
     text_end = "\n"
     if !node.children.count == 1 && node.children[0].name == "img"
-      return "\n" + parse_node(client, node.children[0], true) + "\n"
+      return parse_node(client, node.children[0], true) + "\n"
+    elsif node['class'].match(/title/)
+      subcontent = node.children.collect{|n| parse_node(client, n).strip}.join.strip
+      if node['class'].match(/subtitle/)
+        @document_subtitle = subcontent
+      else
+        @document_title = subcontent
+      end
+      return ""
     end
   when "span"
     text_start = ""
     text_end = ""
   when "text"
-    text_start = node.content.strip.gsub("\"", "''").gsub(/\[ref:(.+?)\]/) do |match|
-      "~\\ref{#{$1}}"
+    if node.content.strip == "<abstract>"
+      @mode = 'abstract'
+      text_start = "\\begin{abstract}"
+    elsif node.content.strip == "</abstract>"
+      text_start = "\\end{abstract}"
+      @mode = 'normal'
+    else
+      text_start = node.content.strip.gsub("\"", "''").gsub(/\[ref:(.+?)\]/) do |match|
+        "~\\ref{#{$1}}"
+      end
+      text_end = ""
     end
-    text_end = ""
   when "a"
     unless (href = node['href']).nil?
       return "\\url{#{href}}" # We have to hack this, since we can't handle content and url in a text document
@@ -141,14 +173,14 @@ def parse_node(client, node, in_p=false)
   when "img"
     src = node['src']
     if src =~ /^https:\/\/www.google.com\/chart\?.*chl=(.+)/
-      symbol = in_p ? "$$" : "$"
+      symbol = in_p ? " $$ " : " $ "
       return symbol + parse_formula($1) + symbol
     else
       image_name = download_image(client, src)
       return "\\begin{figure}[h!]
         \\centering
         \\includegraphics[width=0.45\\textwidth]{#{image_name}}
-        \\caption{\\small Image caption}
+        \\caption{\\small{Image caption}}
         \\label{#{image_name}}
       \\end{figure}"
     end
@@ -176,6 +208,7 @@ result = client.execute api_method: drive.files.get, parameters: { 'fileId' => f
 file = result.data
 
 @document_title = file.title
+@document_subtitle = ""
 
 puts "Converting #{file.title} [template: #{template_file}]"
 
@@ -204,6 +237,7 @@ end
 
 replace_map = {
   'title' => @document_title,
+  'subtitle' => @document_subtitle,
   'author' => file.lastModifyingUserName,
   'yield' => content
 }
