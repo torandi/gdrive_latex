@@ -16,6 +16,7 @@ OUTPUT_DIR='latex/'
 
 @use_chapters = true #TODO: Options parsing
 @replace_backslash_in_formulas = true
+@image_caption = nil
 
 @mode = 'normal'
 
@@ -152,6 +153,14 @@ def parse_node(client, node, in_p=false)
       end
       return ""
     end
+
+    post_process = Proc.new { |text|
+      text.gsub(/[\u201c\u201d"]/, "''").gsub(/\{cite:(.+?)\}/, '~\\cite{\1}').gsub(/\[ref:(.+?)\]/, '~\\ref{\1}').gsub(/\[image_caption:(.+?)\]/) do |match|
+        @image_caption = $1
+        ""
+      end
+
+    }
   when "span"
     text_start = " "
     text_end = " "
@@ -163,7 +172,7 @@ def parse_node(client, node, in_p=false)
       text_start = "\\end{abstract}"
       @mode = 'normal'
     else
-      text_start = node.content.strip.gsub(/[\u201c\u201d"]/, "''").gsub("&", "\&").gsub(/\{cite:(.+?)\}/, '~\\cite{\1}').gsub(/\[ref:(.+?)\]/, '~\\ref{\1}')
+      text_start = node.content.strip
       text_end = ""
     end
   when "a"
@@ -181,13 +190,15 @@ def parse_node(client, node, in_p=false)
       return symbol + parse_formula($1) + symbol
     else
       image_name = download_image(client, src)
-      return "\\begin{figure}[ht]
+      ret = "\\begin{figure}[ht]
         \\begin{center}
-        \\includegraphics{#{image_name}}
-        \\caption{\\small{Image caption}}
+        \\includegraphics[width=\\textwidth]{#{image_name}}
+#{@image_caption.nil? ? "" : "   \\caption{\\small{#@image_caption}}"}
         \\label{#{image_name}}
         \\end{center}
       \\end{figure}"
+      @image_caption = nil
+      return ret
     end
   when "table"
     # Find count:
