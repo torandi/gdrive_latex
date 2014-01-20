@@ -275,6 +275,8 @@ doc.css('body').children.each do |node|
   content = "#{content}#{parse_node client, node}\n"
 end
 
+content = content.gsub(/\n{3,}/, "\n\n").gsub(/[ \t]{2,}/, " ")
+
 replace_map = {
   'title' => @document_title,
   'subtitle' => @document_subtitle,

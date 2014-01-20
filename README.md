@@ -16,7 +16,6 @@ TODO
 ------------------
 * Text styling (Italic/bold/underline etc)
 * Reference list
-* Better detection of inline equation
 
 Setup
 =====
