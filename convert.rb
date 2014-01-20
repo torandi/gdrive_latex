@@ -284,7 +284,4 @@ template.each_line do |line|
   end)
 end
 
-
-out.puts "\\end{document}"
-
 puts "Wrote #{filename}"
