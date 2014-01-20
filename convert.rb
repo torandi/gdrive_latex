@@ -1,4 +1,4 @@
-require 'rubygems'
+require 'bundler/setup'
 require 'nokogiri'
 require 'google/api_client'
 require 'google/api_client/client_secrets'
@@ -10,6 +10,8 @@ require 'digest'
 API_VERSION = 'v2'
 CREDENTIAL_STORE_FILE = "convert-oauth2.json"
 CACHED_API_FILE = "drive-#{API_VERSION}.cache"
+
+OUTPUT_DIR='latex/'
 
 def setup
   client = Google::APIClient.new(
@@ -82,7 +84,7 @@ def download_image(client, download_url)
       ext = ".jpg"
     end
     filename = Digest::MD5.hexdigest(download_url) + ext
-    file = File.open(filename, 'w')
+    file = File.open("#{OUTPUT_DIR}#{filename}", 'w')
     file.write(result.body)
     file.close
     filename
@@ -168,7 +170,7 @@ puts "Converting #{file.title} [template: #{template_file}]"
 template = File.open(template_file, 'r')
 
 
-filename = "#{friendly_filename(file.title).downcase}.tex"
+filename = "#{OUTPUT_DIR}#{friendly_filename(file.title).downcase}.tex"
 
 puts file.exportLinks['text/html']
 
@@ -198,13 +200,13 @@ replace_map = {
 out = File.open(filename, 'w')
 
 template.each_line do |line|
-  out.puts line.gsub(/#\{([^}])\}/) do |match|
+  out.puts(line.gsub(/#\{([^}]+)\}/) do |match|
     if replace_map[$1]
       replace_map[$1]
     else
       "[Invalid data block]"
     end
-  end
+  end)
 end
 
 

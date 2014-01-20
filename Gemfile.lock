@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/google/google-api-ruby-client.git
-  revision: f06f1e33fa1706318a85141323a0e70175fad55f
+  revision: 50ce4df6407461825005180cb89f6caf144bf2d5
   specs:
     google-api-client (0.7.0.rc2)
       addressable (>= 2.3.2)
@@ -22,16 +22,16 @@ GEM
       extlib (>= 0.9.15)
       multi_json (>= 1.0.0)
     extlib (0.9.16)
-    faraday (0.9.0.rc6)
-      multipart-post (~> 1.2.0)
-    jwt (0.1.8)
+    faraday (0.9.0)
+      multipart-post (>= 1.2, < 3)
+    jwt (0.1.11)
       multi_json (>= 1.5)
     launchy (2.4.2)
       addressable (~> 2.3)
-    mini_portile (0.5.1)
-    multi_json (1.8.2)
-    multipart-post (1.2.0)
-    nokogiri (1.6.0)
+    mini_portile (0.5.2)
+    multi_json (1.8.4)
+    multipart-post (2.0.0)
+    nokogiri (1.6.1)
       mini_portile (~> 0.5.0)
     signet (0.5.0)
       addressable (>= 2.2.3)
