@@ -108,6 +108,8 @@ def parse_node(client, node, in_p=false)
   text_end = ""
   post_process = Proc.new {|text| text }
 
+  next_in_p = false
+
   case node.node_name
   when /h([1-9])/
     h_num = $1.to_i
@@ -133,6 +135,7 @@ def parse_node(client, node, in_p=false)
       "#{text}#{postfix}"
     end
   when "p"
+    next_in_p = true
     text_start = ""
     text_end = "\n"
     if !node.children.count == 1 && node.children[0].name == "img"
@@ -157,7 +160,7 @@ def parse_node(client, node, in_p=false)
       text_start = "\\end{abstract}"
       @mode = 'normal'
     else
-      text_start = node.content.strip.gsub(/[\u201c\u201d"]/, "''").gsub("&", "\&").gsub(/\[ref:(.+?)\]/, "~\\ref{\1}")
+      text_start = node.content.strip.gsub(/[\u201c\u201d"]/, "''").gsub("&", "\&").gsub(/\{(.+?)\}/, '~\\cite{\1}').gsub(/\[ref:(.+?)\]/, '~\\ref{\1}')
       text_end = ""
     end
   when "a"
@@ -214,7 +217,7 @@ def parse_node(client, node, in_p=false)
     puts "Unhandled node type #{node.name}"
   end
 
-  post_process.call(text_start + node.children.collect{|n| parse_node(client, n)}.join.strip + text_end)
+  post_process.call(text_start + node.children.collect{|n| parse_node(client, n, next_in_p)}.join.strip + text_end)
 end
 
 template_file = "default.tex"
