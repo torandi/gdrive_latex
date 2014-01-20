@@ -8,14 +8,15 @@ Features
 * Formulas
 * Images
 * Headings
-
-Things that are not implemented
-------------------
 * Tables
-* Text styling (Italic/bold/underline etc)
 * Lists
+* References lables etc are handled with some hacks (todo: describe these)
 
-These things might be implemented in the future
+TODO
+------------------
+* Text styling (Italic/bold/underline etc)
+* Reference list
+* Better detection of inline equation
 
 Setup
 =====

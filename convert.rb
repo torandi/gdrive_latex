@@ -107,12 +107,10 @@ def parse_formula(input)
   ret
 end
 
-def parse_node(client, node, in_p=false)
+def parse_node(client, node, alone_in_p=false)
   text_start = ""
   text_end = ""
   post_process = Proc.new {|text| text }
-
-  next_in_p = false
 
   case node.node_name
   when /h([1-9])/
@@ -139,11 +137,10 @@ def parse_node(client, node, in_p=false)
       "#{text}#{postfix}"
     end
   when "p"
-    next_in_p = true
     text_start = ""
     text_end = ""
-    if !node.children.count == 1 && node.children[0].name == "img"
-      return parse_node(client, node.children[0], true) + "\n"
+    if node.children.count == 1 && node.children[0].name == "img"
+      return parse_node(client, node.children[0], true)
     elsif node['class'].match(/title/)
       subcontent = node.children.collect{|n| parse_node(client, n).strip}.join.strip
       if node['class'].match(/subtitle/)
@@ -186,7 +183,7 @@ def parse_node(client, node, in_p=false)
   when "img"
     src = node['src']
     if src =~ /^https:\/\/www.google.com\/chart\?.*chl=(.+)/
-      symbol = in_p ? " $$ " : " $ "
+      symbol = alone_in_p ? " $$ " : " $ "
       return symbol + parse_formula($1) + symbol
     else
       image_name = download_image(client, src)
@@ -231,7 +228,7 @@ def parse_node(client, node, in_p=false)
     puts "Unhandled node type #{node.name}"
   end
 
-  post_process.call(text_start + node.children.collect{|n| parse_node(client, n, next_in_p)}.join.strip + text_end)
+  post_process.call(text_start + node.children.collect{|n| parse_node(client, n)}.join.strip + text_end)
 end
 
 template_file = "default.tex"
