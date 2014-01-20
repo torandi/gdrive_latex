@@ -15,6 +15,7 @@ OUTPUT_DIR='latex/'
 
 
 @use_chapters = true #TODO: Options parsing
+@replace_backslash_in_formulas = true
 
 @mode = 'normal'
 
@@ -100,7 +101,9 @@ def download_image(client, download_url)
 end
 
 def parse_formula(input)
-  URI::decode(input).gsub("\\+","")
+  ret = URI::decode(input).gsub("\\+","")
+  ret.gsub!("\\backslash", "\\") if @replace_backslash_in_formulas
+  ret
 end
 
 def parse_node(client, node, in_p=false)
@@ -137,7 +140,7 @@ def parse_node(client, node, in_p=false)
   when "p"
     next_in_p = true
     text_start = ""
-    text_end = "\n"
+    text_end = ""
     if !node.children.count == 1 && node.children[0].name == "img"
       return parse_node(client, node.children[0], true) + "\n"
     elsif node['class'].match(/title/)
@@ -160,7 +163,7 @@ def parse_node(client, node, in_p=false)
       text_start = "\\end{abstract}"
       @mode = 'normal'
     else
-      text_start = node.content.strip.gsub(/[\u201c\u201d"]/, "''").gsub("&", "\&").gsub(/\{(.+?)\}/, '~\\cite{\1}').gsub(/\[ref:(.+?)\]/, '~\\ref{\1}')
+      text_start = node.content.strip.gsub(/[\u201c\u201d"]/, "''").gsub("&", "\&").gsub(/\{cite:(.+?)\}/, '~\\cite{\1}').gsub(/\[ref:(.+?)\]/, '~\\ref{\1}')
       text_end = ""
     end
   when "a"
