@@ -101,11 +101,21 @@ end
 def parse_node(client, node, in_p=false)
   text_start = ""
   text_end = ""
+  post_process = Proc.new {|text| text }
 
   case node.node_name
   when /h([1-9])/
     text_start = "\\" + ($1.to_i - 2).times.collect{"sub"}.join + "section {"
     text_end = "}\n"
+    post_process = Proc.new do |text|
+      postfix = ""
+      text.gsub!(/\[label:(.*)\]/) { |match|
+        postfix = "\\label{#{$1}}"
+        ""
+      }
+
+      "#{text}#{postfix}"
+    end
   when "p"
     text_start = "\n"
     text_end = "\n"
@@ -116,7 +126,9 @@ def parse_node(client, node, in_p=false)
     text_start = ""
     text_end = ""
   when "text"
-    text_start = node.content.strip.gsub("\"", "''")
+    text_start = node.content.strip.gsub("\"", "''").gsub(/\[ref:(.+?)\]/) do |match|
+      "~\\ref{#{$1}}"
+    end
     text_end = ""
   when "a"
     unless (href = node['href']).nil?
@@ -144,7 +156,7 @@ def parse_node(client, node, in_p=false)
     puts "Unhandled node type #{node.name}"
   end
 
-  text_start + node.children.collect{|n| parse_node(client, n)}.join.strip + text_end
+  post_process.call(text_start + node.children.collect{|n| parse_node(client, n)}.join.strip + text_end)
 end
 
 template_file = "default.tex"
