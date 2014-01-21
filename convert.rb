@@ -195,7 +195,7 @@ def parse_node(client, node, alone_in_p=false)
       parse_references
     elsif node.content.strip == "</references>"
       @mode = 'normal'
-      text_end = "\\biblography{#@base_name}\n"
+      text_end = "\\bibliography{#@base_name}\n"
     else
       text_start = node.content.strip
       text_end = ""
