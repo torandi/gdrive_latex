@@ -6,6 +6,7 @@ require 'google/api_client/auth/file_storage'
 require 'google/api_client/auth/installed_app'
 require 'uri'
 require 'digest'
+require 'set'
 
 API_VERSION = 'v2'
 CREDENTIAL_STORE_FILE = "convert-oauth2.json"
@@ -102,6 +103,28 @@ def download_image(client, download_url)
   end
 end
 
+def parse_references
+  bib = File.open(@bibtex_file, 'r')
+  @references = Set.new
+  bib.each_line do |line|
+    if line.match /@.+{(.+),/
+      @references.add $1
+    end
+  end
+  bib.close
+end
+
+def add_reference(title, content)
+  unless @references.add?(title).nil?
+    puts "Add reference: #{title} => #{content}"
+    bib = File.open(@bibtex_file, 'a')
+    bib.puts "@article{#{title},"
+    bib.puts "\t#{content}"
+    bib.puts "}\n"
+    bib.close
+  end
+end
+
 def parse_formula(input)
   ret = URI::decode(input).gsub("\\+","")
   ret.gsub!("\\backslash", "\\") if @replace_backslash_in_formulas
@@ -139,7 +162,7 @@ def parse_node(client, node, alone_in_p=false)
     end
   when "p"
     text_start = ""
-    text_end = ""
+    text_end = "\n"
     if node.children.count == 1 && node.children[0].name == "img"
       return parse_node(client, node.children[0], true)
     elsif node['class'].match(/title/)
@@ -165,10 +188,14 @@ def parse_node(client, node, alone_in_p=false)
   when "text"
     if node.content.strip == "<abstract>"
       @mode = 'abstract'
-      text_start = "\\begin{abstract}"
     elsif node.content.strip == "</abstract>"
-      text_start = "\\end{abstract}"
       @mode = 'normal'
+    elsif node.content.strip == "<references>"
+      @mode = 'references'
+      parse_references
+    elsif node.content.strip == "</references>"
+      @mode = 'normal'
+      text_end = "\\biblography{#@base_name}\n"
     else
       text_start = node.content.strip
       text_end = ""
@@ -228,8 +255,22 @@ def parse_node(client, node, alone_in_p=false)
     text_start = "\\begin{enumerate}\n"
     text_end = "\n\\end{enumerate}\n"
   when "li"
-    text_start = "\\item "
-    text_end = "\n"
+    if @mode == 'references'
+      raw = node.children.collect{|n| parse_node(client, n)}.join.strip
+      colon_index = raw.index(":")
+      if colon_index.nil?
+        title = raw
+        content = ""
+      else
+        #puts "Reference: raw: #{raw}, colon_index: #{colon_index}"
+        title = raw[0..(colon_index-1)].strip
+        content = raw[(colon_index + 1)..-1].strip
+      end
+      add_reference(title, content)
+    else
+      text_start = "\\item "
+      text_end = "\n"
+    end
   else
     puts "Unhandled node type #{node.name}"
   end
@@ -255,13 +296,16 @@ file = result.data
 
 @document_title = file.title
 @document_subtitle = ""
+@abstract = ""
 
 puts "Converting #{file.title} [template: #{template_file}]"
 
 template = File.open(template_file, 'r')
 
 
-filename = "#{OUTPUT_DIR}#{friendly_filename(file.title).downcase}.tex"
+@base_name = friendly_filename(file.title).downcase
+filename = "#{OUTPUT_DIR}#@base_name.tex"
+@bibtex_file = "#{OUTPUT_DIR}#@base_name.bib"
 
 puts file.exportLinks['text/html']
 
@@ -278,8 +322,17 @@ doc = Nokogiri::HTML(html_content)
 content = ""
 
 doc.css('body').children.each do |node|
-  content = "#{content}#{parse_node client, node}\n"
+  node_content = parse_node(client, node)
+  if @mode == 'normal'
+    content = "#{content}#{node_content}"
+  elsif @mode == 'abstract'
+    @abstract = "#{@abstract}#{node_content}"
+  else
+    # Ignore other modes
+  end
 end
+
+puts "Warning, missing <#@mode> end tag" if @mode != 'normal'
 
 content = content.gsub(/\n{3,}/, "\n\n").gsub(/[ \t]{2,}/, " ")
 
@@ -287,7 +340,8 @@ replace_map = {
   'title' => @document_title,
   'subtitle' => @document_subtitle,
   'author' => file.lastModifyingUserName,
-  'yield' => content
+  'yield' => content,
+  'abstract' => @abstract
 }
 
 # Begin output and template parsing
