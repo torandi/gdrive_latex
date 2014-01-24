@@ -22,6 +22,8 @@ OUTPUT_DIR='latex/'
 
 @mode = 'normal'
 
+@styles = {}
+
 def setup
   client = Google::APIClient.new(
     :application_name => 'LaTeX Converter',
@@ -125,6 +127,29 @@ def add_reference(title, content)
   end
 end
 
+def parse_style(klass)
+  return @styles[klass] if @styles[klass]
+
+  if @style.match(/\.#{klass}\{(.+?)\}/)
+    style = nil
+    case $1
+      when "font-weight:bold"
+        style = "\\textbf{"
+      when "font-style:italic"
+        style = "\\textit{"
+      when "text-decoration:underline"
+        style ="\\underline{"
+      else
+        puts "Unknown style #{$1}"
+    end
+    @styles[klass] = style
+  else
+    @styles[klass] = nil
+  end
+
+  return @styles[klass]
+end
+
 def parse_formula(input)
   ret = URI::decode(input).gsub("\\+","")
   ret.gsub!("\\backslash", "\\") if @replace_backslash_in_formulas
@@ -135,6 +160,7 @@ def parse_node(client, node, alone_in_p=false)
   text_start = ""
   text_end = ""
   post_process = Proc.new {|text| text }
+  pre_append_process = Proc.new {|text| text }
 
   case node.node_name
   when /h([1-9])/
@@ -185,6 +211,16 @@ def parse_node(client, node, alone_in_p=false)
   when "span"
     text_start = " "
     text_end = " "
+    if !node['class'].nil?
+      node['class'].split(" ").each do |klass|
+        style = parse_style(klass)
+        unless style.nil?
+          text_start = "#{style}#{text_start}"
+          text_end = "}#{text_end}"
+        end
+      end
+    end
+    pre_append_process = Proc.new { |text| text.strip }
   when "text"
     if node.content.strip == "<abstract>"
       @mode = 'abstract'
@@ -241,7 +277,7 @@ def parse_node(client, node, alone_in_p=false)
   when "tr"
     text_start = ""
     text_end = "\\\\\n"
-    post_process = Proc.new { |text|
+    pre_append_process = Proc.new { |text|
       text.slice!(text.rindex("&"), 1)
       text
     }
@@ -275,7 +311,7 @@ def parse_node(client, node, alone_in_p=false)
     puts "Unhandled node type #{node.name}"
   end
 
-  post_process.call(text_start + node.children.collect{|n| parse_node(client, n)}.join.strip + text_end)
+  post_process.call(text_start + pre_append_process.call(node.children.collect{|n| parse_node(client, n)}.join.strip) + text_end)
 end
 
 template_file = "default.tex"
@@ -320,6 +356,12 @@ html_out.close
 doc = Nokogiri::HTML(html_content)
 
 content = ""
+
+@style = ""
+
+doc.css('head').css('style').each do |node|
+  @style = "#{@style}#{node.children[0].to_s}"
+end
 
 doc.css('body').children.each do |node|
   node_content = parse_node(client, node)
