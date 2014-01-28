@@ -106,14 +106,16 @@ def download_image(client, download_url)
 end
 
 def parse_references
-  bib = File.open(@bibtex_file, 'r')
   @references = Set.new
-  bib.each_line do |line|
-    if line.match /@.+{(.+),/
-      @references.add $1
+  if File.exists?(@bibtex_file)
+    bib = File.open(@bibtex_file, 'r')
+    bib.each_line do |line|
+      if line.match /@.+{(.+),/
+        @references.add $1
+      end
     end
+    bib.close
   end
-  bib.close
 end
 
 def add_reference(title, content)
